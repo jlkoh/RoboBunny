@@ -799,6 +799,12 @@ body {
     cursor: pointer;
 }
 
+.map-select option {
+    background: #1a1a2e;
+    color: #ffffff;
+    padding: 8px;
+}
+
 .control-btn {
     padding: 12px 25px;
     font-size: 1rem;
