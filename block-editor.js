@@ -63,9 +63,22 @@ class BlockEditor {
                     const blockType = e.dataTransfer.getData('blockType');
                     const blockValue = e.dataTransfer.getData('blockValue');
                     const isNew = e.dataTransfer.getData('isNew') === 'true';
+                    const isChild = e.dataTransfer.getData('isChild') === 'true';
 
                     if (isNew && this.countBlocks() < this.blockLimit) {
                         this.addBlock(blockType, blockValue, -1);
+                    } else {
+                        // Move existing block (from main or any loop) to main program end
+                        if (this.draggedBlockSourceArray && this.draggedBlockIndex !== null) {
+                            const movedBlock = this.draggedBlockSourceArray.splice(this.draggedBlockIndex, 1)[0];
+                            this.program.push(movedBlock);
+                            this.renderProgram();
+                            this.updateBlockCount();
+
+                            // Reset
+                            this.draggedBlockSourceArray = null;
+                            this.draggedBlockIndex = null;
+                        }
                     }
                 }
             });
@@ -222,6 +235,7 @@ class BlockEditor {
         el.addEventListener('dragstart', (e) => {
             e.stopPropagation();
             this.draggedBlockIndex = index;
+            this.draggedBlockSourceArray = this.program; // Store source array
             e.dataTransfer.setData('blockType', block.type);
             e.dataTransfer.setData('isNew', 'false');
             e.dataTransfer.setData('fromIndex', index.toString());
@@ -284,19 +298,34 @@ class BlockEditor {
                 const blockType = e.dataTransfer.getData('blockType');
                 const blockValue = e.dataTransfer.getData('blockValue');
                 const isNew = e.dataTransfer.getData('isNew') === 'true';
+                const isChild = e.dataTransfer.getData('isChild') === 'true';
 
-                if (isNew && this.countBlocks() < this.blockLimit) {
-                    // Add to children (including nested Repeat)
-                    const childBlock = {
-                        type: blockType,
-                        value: this.parseValue(blockType, blockValue)
-                    };
-                    if (blockType === 'Repeat') {
-                        childBlock.children = [];
+                if (isNew) {
+                    // New block from palette
+                    if (this.countBlocks() < this.blockLimit) {
+                        const childBlock = {
+                            type: blockType,
+                            value: this.parseValue(blockType, blockValue)
+                        };
+                        if (blockType === 'Repeat') {
+                            childBlock.children = [];
+                        }
+                        this.program[index].children.push(childBlock);
+                        this.renderProgram();
+                        this.updateBlockCount();
                     }
-                    this.program[index].children.push(childBlock);
-                    this.renderProgram();
-                    this.updateBlockCount();
+                } else {
+                    if (this.draggedBlockSourceArray && this.draggedBlockIndex !== null) {
+                        const movedBlock = this.draggedBlockSourceArray.splice(this.draggedBlockIndex, 1)[0];
+                        this.program[index].children.push(movedBlock);
+
+                        this.renderProgram();
+                        this.updateBlockCount();
+
+                        // Reset
+                        this.draggedBlockSourceArray = null;
+                        this.draggedBlockIndex = null;
+                    }
                 }
             });
 
@@ -327,6 +356,7 @@ class BlockEditor {
         el.className = 'program-block child-block';
         el.dataset.parentIndex = parentIndex;
         el.dataset.childIndex = childIndex;
+        el.draggable = true;
 
         // Add control class for nested Repeat
         if (block.type === 'Repeat') {
@@ -335,6 +365,94 @@ class BlockEditor {
 
         el.innerHTML = this.getBlockHTML(block) +
             `<button class="delete-btn">×</button>`;
+
+        // Drag events for child blocks
+        el.addEventListener('dragstart', (e) => {
+            e.stopPropagation();
+            this.draggedBlockIndex = childIndex;
+            this.draggedBlockSourceArray = parentChildren; // Store source array
+            e.dataTransfer.setData('blockType', block.type);
+            e.dataTransfer.setData('blockValue', block.value.toString());
+            e.dataTransfer.setData('isNew', 'false');
+            e.dataTransfer.setData('isChild', 'true');
+            // These might still be useful for other things but sourceArray is main source of truth
+            e.dataTransfer.setData('parentIndex', parentIndex.toString());
+            e.dataTransfer.setData('childIndex', childIndex.toString());
+            el.classList.add('dragging');
+        });
+
+        el.addEventListener('dragend', () => {
+            el.classList.remove('dragging');
+        });
+
+        // Drop zone for reordering within loop
+        el.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const rect = el.getBoundingClientRect();
+            const midY = rect.top + rect.height / 2;
+            el.classList.remove('drop-above', 'drop-below');
+            if (e.clientY < midY) {
+                el.classList.add('drop-above');
+            } else {
+                el.classList.add('drop-below');
+            }
+        });
+
+        el.addEventListener('dragleave', () => {
+            el.classList.remove('drop-above', 'drop-below');
+        });
+
+        el.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            el.classList.remove('drop-above', 'drop-below');
+
+            const isNew = e.dataTransfer.getData('isNew') === 'true';
+            const isChild = e.dataTransfer.getData('isChild') === 'true';
+            const blockType = e.dataTransfer.getData('blockType');
+            const blockValue = e.dataTransfer.getData('blockValue');
+
+            const rect = el.getBoundingClientRect();
+            const midY = rect.top + rect.height / 2;
+            let insertIndex = e.clientY < midY ? childIndex : childIndex + 1;
+
+            if (isNew) {
+                // New block from palette
+                if (this.countBlocks() < this.blockLimit) {
+                    const newBlock = {
+                        type: blockType,
+                        value: this.parseValue(blockType, blockValue)
+                    };
+                    if (blockType === 'Repeat') {
+                        newBlock.children = [];
+                    }
+                    parentChildren.splice(insertIndex, 0, newBlock);
+                    this.renderProgram();
+                    this.updateBlockCount();
+                }
+            } else {
+                if (this.draggedBlockSourceArray && this.draggedBlockIndex !== null) {
+                    const sourceArray = this.draggedBlockSourceArray;
+
+                    // If moving within same array (parentChildren), need to handle index shift
+                    let actualInsertIndex = insertIndex;
+                    if (sourceArray === parentChildren && this.draggedBlockIndex < insertIndex) {
+                        actualInsertIndex--;
+                    }
+
+                    const movedBlock = sourceArray.splice(this.draggedBlockIndex, 1)[0];
+                    parentChildren.splice(actualInsertIndex, 0, movedBlock);
+
+                    this.renderProgram();
+                    this.updateBlockCount();
+
+                    // Reset
+                    this.draggedBlockSourceArray = null;
+                    this.draggedBlockIndex = null;
+                }
+            }
+        });
 
         // Delete child
         el.querySelector('.delete-btn').addEventListener('click', (e) => {
@@ -383,17 +501,32 @@ class BlockEditor {
                 const blockValue = e.dataTransfer.getData('blockValue');
                 const isNew = e.dataTransfer.getData('isNew') === 'true';
 
-                if (isNew && this.countBlocks() < this.blockLimit) {
-                    const newChild = {
-                        type: blockType,
-                        value: this.parseValue(blockType, blockValue)
-                    };
-                    if (blockType === 'Repeat') {
-                        newChild.children = [];
+                if (isNew) {
+                    // New block from palette
+                    if (this.countBlocks() < this.blockLimit) {
+                        const newChild = {
+                            type: blockType,
+                            value: this.parseValue(blockType, blockValue)
+                        };
+                        if (blockType === 'Repeat') {
+                            newChild.children = [];
+                        }
+                        block.children.push(newChild);
+                        this.renderProgram();
+                        this.updateBlockCount();
                     }
-                    block.children.push(newChild);
-                    this.renderProgram();
-                    this.updateBlockCount();
+                } else {
+                    if (this.draggedBlockSourceArray && this.draggedBlockIndex !== null) {
+                        const movedBlock = this.draggedBlockSourceArray.splice(this.draggedBlockIndex, 1)[0];
+                        block.children.push(movedBlock);
+
+                        this.renderProgram();
+                        this.updateBlockCount();
+
+                        // Reset
+                        this.draggedBlockSourceArray = null;
+                        this.draggedBlockIndex = null;
+                    }
                 }
             });
 
@@ -463,9 +596,25 @@ class BlockEditor {
                         this.addBlock(blockType, blockValue, insertIndex);
                     }
                 } else {
-                    const fromIndex = parseInt(e.dataTransfer.getData('fromIndex'));
-                    if (fromIndex !== insertIndex) {
-                        this.moveBlock(fromIndex, insertIndex);
+                    if (this.draggedBlockSourceArray && this.draggedBlockIndex !== null) {
+                        // Handle reordering within main program or moving from loop
+                        const sourceArray = this.draggedBlockSourceArray;
+
+                        // If moving within same array (this.program), need to handle index shift
+                        let actualInsertIndex = insertIndex;
+                        if (sourceArray === this.program && this.draggedBlockIndex < insertIndex) {
+                            actualInsertIndex--;
+                        }
+
+                        const movedBlock = sourceArray.splice(this.draggedBlockIndex, 1)[0];
+                        this.program.splice(actualInsertIndex, 0, movedBlock);
+
+                        this.renderProgram();
+                        this.updateBlockCount();
+
+                        // Reset
+                        this.draggedBlockSourceArray = null;
+                        this.draggedBlockIndex = null;
                     }
                 }
             });
