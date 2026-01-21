@@ -99,20 +99,30 @@ class MapDesigner {
         const grid = document.getElementById('designer-grid');
         if (grid) {
             let isMouseDown = false;
+            let lastPaintedCell = null;
 
             grid.addEventListener('mousedown', (e) => {
+                const cell = e.target.closest('.cell');
+                if (!cell) return;
                 isMouseDown = true;
+                // Set lastPaintedCell BEFORE handleCellClick to prevent re-triggering
+                lastPaintedCell = `${cell.dataset.x},${cell.dataset.y}`;
                 this.handleCellClick(e);
             });
 
             grid.addEventListener('mousemove', (e) => {
-                if (isMouseDown) {
-                    this.handleCellClick(e);
-                }
+                if (!isMouseDown) return;
+                const cell = e.target.closest('.cell');
+                if (!cell) return;
+                const currentCellKey = `${cell.dataset.x},${cell.dataset.y}`;
+                if (currentCellKey === lastPaintedCell) return; // Skip same cell
+                lastPaintedCell = currentCellKey;
+                this.handleCellClick(e);
             });
 
             document.addEventListener('mouseup', () => {
                 isMouseDown = false;
+                lastPaintedCell = null;
             });
         }
 
