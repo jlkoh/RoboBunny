@@ -393,6 +393,7 @@ class GameEngine {
                     case 'MULTIPLY': return left * right;
                     case 'DIVIDE': return left / right;
                     case 'POWER': return Math.pow(left, right);
+                    case 'MODULO': return left % right;
                     default: return 0;
                 }
 

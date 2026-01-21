@@ -88,7 +88,8 @@ class BlockEditor {
                         'colour': '#5b67a5',
                         'contents': [
                             { 'kind': 'block', 'type': 'math_number' },
-                            { 'kind': 'block', 'type': 'math_arithmetic' }
+                            { 'kind': 'block', 'type': 'math_arithmetic' },
+                            { 'kind': 'block', 'type': 'math_modulo' }
                         ]
                     },
                     {
@@ -387,6 +388,12 @@ class BlockEditor {
 
             case 'logic_negate': {
                 return { type: 'Not', child: this.expressionToNode(block.getInputTargetBlock('BOOL')) };
+            }
+
+            case 'math_modulo': {
+                const left = this.expressionToNode(block.getInputTargetBlock('DIVIDEND'));
+                const right = this.expressionToNode(block.getInputTargetBlock('DIVISOR'));
+                return { type: 'Binary', op: 'MODULO', left: left, right: right };
             }
 
             case 'bunny_x':
