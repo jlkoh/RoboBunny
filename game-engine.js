@@ -24,6 +24,7 @@ class GameEngine {
         };
 
         this.directionOrder = ['up', 'right', 'down', 'left'];
+        this.executionLimit = 1000; // Prevent infinite loops
     }
 
     /**
@@ -274,60 +275,153 @@ class GameEngine {
     async executeProgram(program) {
         this.isRunning = true;
         this.setStatus('執行中...', 'running');
+        this.executionCounter = 0; // Reset safety counter
 
-        const result = await this.executeCommands(program, 0);
+        // program is now an AST (Array of nodes)
+        await this.executeCommands(program);
 
         this.isRunning = false;
 
         if (!this.isGameOver) {
             this.setStatus(`完成！得分：${this.score}`, 'complete');
         }
+    }
 
-        return result;
+    async executeCommands(nodes) {
+        if (!nodes || !Array.isArray(nodes)) return;
+
+        for (const node of nodes) {
+            // Safety check for infinite loops or deep recursion
+            this.executionCounter++;
+            if (this.executionCounter > this.executionLimit) {
+                this.setStatus('程式執行過久 (可能有無窮迴圈)', 'error');
+                this.isGameOver = true;
+                return;
+            }
+
+            if (this.isGameOver) return;
+
+            await this.executeNode(node);
+        }
     }
 
     /**
-     * Execute commands recursively, handling control structures
+     * Execute a single AST node
      */
-    async executeCommands(commands, startIndex) {
-        let i = startIndex;
+    async executeNode(node) {
+        // Highlight logic could be added here if we map nodes to block IDs
 
-        while (i < commands.length) {
-            if (this.isGameOver) return i;
-
-            const cmd = commands[i];
-
-            // Highlight current block
-            this.highlightBlock(i);
-
-            if (cmd.type === 'Repeat') {
-                // Find matching EndRepeat
-                let depth = 1;
-                let endIndex = i + 1;
-                while (endIndex < commands.length && depth > 0) {
-                    if (commands[endIndex].type === 'Repeat') depth++;
-                    if (commands[endIndex].type === 'EndRepeat') depth--;
-                    endIndex++;
+        switch (node.type) {
+            case 'If':
+                const condition = this.evaluate(node.condition);
+                if (condition) {
+                    await this.executeCommands(node.then);
+                } else if (node.else) {
+                    await this.executeCommands(node.else);
                 }
-                endIndex--;
+                break;
 
-                // Execute loop body
-                const loopBody = commands.slice(i + 1, endIndex);
-                for (let rep = 0; rep < cmd.value; rep++) {
-                    if (this.isGameOver) return i;
-                    await this.executeCommands(loopBody, 0);
+            case 'While':
+                while (this.evaluate(node.condition)) {
+                    if (this.isGameOver) return;
+
+                    // infinite loop check
+                    if (this.executionCounter > this.executionLimit) {
+                        this.setStatus('無窮迴圈偵測！', 'error');
+                        this.isGameOver = true;
+                        return;
+                    }
+                    this.executionCounter++;
+
+                    await this.executeCommands(node.body);
+                }
+                break;
+
+            case 'Repeat':
+                // Support both constant value and expression
+                let times = node.times;
+                if (typeof times === 'object') { // It's an expression node
+                    times = this.evaluate(times);
                 }
 
-                i = endIndex + 1;
-            } else if (cmd.type === 'EndRepeat') {
-                i++;
-            } else {
-                await this.executeCommand(cmd);
-                i++;
-            }
+                for (let i = 0; i < times; i++) {
+                    if (this.isGameOver) return;
+                    await this.executeCommands(node.body);
+                }
+                break;
+
+            case 'F_Jump':
+            case 'FR_Jump':
+            case 'FL_Jump':
+            case 'Turn':
+                // Evaluate argument if it's dynamic
+                let val = node.value;
+                if (typeof val === 'object') {
+                    val = this.evaluate(val);
+                }
+                await this.executeCommand({ type: node.type, value: val });
+                break;
+        }
+    }
+
+    /**
+     * Evaluate an expression node to a value
+     */
+    evaluate(node) {
+        if (!node) return 0;
+        if (typeof node === 'number' || typeof node === 'string' || typeof node === 'boolean') {
+            return node;
         }
 
-        return i;
+        switch (node.type) {
+            case 'Number':
+            case 'Boolean':
+            case 'String':
+                return node.value;
+
+            case 'Get':
+                if (node.name === 'bunny_x') return this.bunny.x;
+                if (node.name === 'bunny_y') return this.bunny.y;
+                return 0;
+
+            case 'Binary':
+                const left = this.evaluate(node.left);
+                const right = this.evaluate(node.right);
+                switch (node.op) {
+                    case 'ADD': return left + right;
+                    case 'MINUS': return left - right;
+                    case 'MULTIPLY': return left * right;
+                    case 'DIVIDE': return left / right;
+                    case 'POWER': return Math.pow(left, right);
+                    default: return 0;
+                }
+
+            case 'Compare':
+                const cLeft = this.evaluate(node.left);
+                const cRight = this.evaluate(node.right);
+                switch (node.op) {
+                    case 'EQ': return cLeft == cRight;
+                    case 'NEQ': return cLeft != cRight;
+                    case 'LT': return cLeft < cRight;
+                    case 'LTE': return cLeft <= cRight;
+                    case 'GT': return cLeft > cRight;
+                    case 'GTE': return cLeft >= cRight;
+                    default: return false;
+                }
+
+            case 'Logic':
+                switch (node.op) {
+                    case 'AND': return this.evaluate(node.left) && this.evaluate(node.right);
+                    case 'OR': return this.evaluate(node.left) || this.evaluate(node.right);
+                    default: return false;
+                }
+
+            case 'Not':
+                return !this.evaluate(node.child);
+
+            default:
+                return 0;
+        }
     }
 
     /**

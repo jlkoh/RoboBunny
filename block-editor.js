@@ -53,7 +53,7 @@ class BlockEditor {
                     {
                         'kind': 'category',
                         'name': '控制',
-                        'colour': '#a55b80',
+                        'colour': '#5ba55b',
                         'contents': [
                             {
                                 'kind': 'block',
@@ -62,13 +62,42 @@ class BlockEditor {
                                     'TIMES': {
                                         'shadow': {
                                             'type': 'math_number',
-                                            'fields': {
-                                                'NUM': 2
-                                            }
+                                            'fields': { 'NUM': 2 }
                                         }
                                     }
                                 }
-                            }
+                            },
+                            { 'kind': 'block', 'type': 'controls_whileUntil' },
+                            { 'kind': 'block', 'type': 'controls_if' }
+                        ]
+                    },
+                    {
+                        'kind': 'category',
+                        'name': '邏輯',
+                        'colour': '#5b80a5',
+                        'contents': [
+                            { 'kind': 'block', 'type': 'logic_compare' },
+                            { 'kind': 'block', 'type': 'logic_operation' },
+                            { 'kind': 'block', 'type': 'logic_negate' },
+                            { 'kind': 'block', 'type': 'logic_boolean' }
+                        ]
+                    },
+                    {
+                        'kind': 'category',
+                        'name': '數學',
+                        'colour': '#5b67a5',
+                        'contents': [
+                            { 'kind': 'block', 'type': 'math_number' },
+                            { 'kind': 'block', 'type': 'math_arithmetic' }
+                        ]
+                    },
+                    {
+                        'kind': 'category',
+                        'name': '兔子狀態',
+                        'colour': '#a5745b',
+                        'contents': [
+                            { 'kind': 'block', 'type': 'bunny_x' },
+                            { 'kind': 'block', 'type': 'bunny_y' }
                         ]
                     }
                 ]
@@ -153,6 +182,28 @@ class BlockEditor {
                 this.setHelpUrl("");
             }
         };
+
+        // Custom block: bunny X position
+        Blockly.Blocks['bunny_x'] = {
+            init: function () {
+                this.appendDummyInput()
+                    .appendField("兔子 X 座標");
+                this.setOutput(true, 'Number');
+                this.setColour(40);
+                this.setTooltip("取得兔子當前的 X 座標");
+            }
+        };
+
+        // Custom block: bunny Y position
+        Blockly.Blocks['bunny_y'] = {
+            init: function () {
+                this.appendDummyInput()
+                    .appendField("兔子 Y 座標");
+                this.setOutput(true, 'Number');
+                this.setColour(40);
+                this.setTooltip("取得兔子當前的 Y 座標");
+            }
+        };
     }
 
     /**
@@ -200,7 +251,10 @@ class BlockEditor {
     /**
      * Convert Blockly workspace to flat command array for GameEngine
      */
-    getFlattenedProgram() {
+    /**
+     * Convert Blockly workspace to AST for GameEngine
+     */
+    getProgramAST() {
         if (!this.workspace) return [];
 
         const topBlocks = this.workspace.getTopBlocks(true); // Ordered by position
@@ -209,60 +263,146 @@ class BlockEditor {
         // We assume the first top block is the start of the program
         const startBlock = topBlocks[0];
 
-        const traverse = (block) => {
-            const cmds = [];
-            let currentBlock = block;
+        return this.blocksToAST(startBlock);
+    }
 
-            while (currentBlock) {
-                if (!currentBlock.isEnabled()) {
-                    currentBlock = currentBlock.getNextBlock();
-                    continue;
-                }
+    /**
+     * Recursively convert blocks to AST nodes
+     */
+    blocksToAST(startBlock) {
+        const nodes = [];
+        let currentBlock = startBlock;
 
-                if (currentBlock.type === 'controls_repeat_ext') {
-                    // Handle Repeat Loop
-                    const timesBlock = currentBlock.getInputTargetBlock('TIMES');
-                    let repeatCount = 2; // Default
-                    if (timesBlock && timesBlock.type === 'math_number') {
-                        repeatCount = parseInt(timesBlock.getFieldValue('NUM')) || 2;
-                    }
-
-                    const branchBlock = currentBlock.getInputTargetBlock('DO');
-                    const childCmds = traverse(branchBlock); // Recursively get children
-
-                    // Flatten loop: repeat the commands N times
-                    for (let i = 0; i < repeatCount; i++) {
-                        cmds.push(...childCmds.map(cmd => ({ ...cmd }))); // Clone objects to avoid reference issues
-                    }
-
-                } else if (['F_Jump', 'FR_Jump', 'FL_Jump', 'Turn'].includes(currentBlock.type)) {
-                    // Handle Action Blocks
-                    let val = currentBlock.getFieldValue('VALUE');
-
-                    // Parse numbers for jumps
-                    if (currentBlock.type.includes('Jump')) {
-                        val = parseInt(val);
-                    }
-
-                    cmds.push({
-                        type: currentBlock.type,
-                        value: val
-                    });
-                }
-
+        while (currentBlock) {
+            if (!currentBlock.isEnabled()) {
                 currentBlock = currentBlock.getNextBlock();
+                continue;
             }
-            return cmds;
-        };
 
-        return traverse(startBlock);
+            const node = this.blockToNode(currentBlock);
+            if (node) {
+                nodes.push(node);
+            }
+
+            currentBlock = currentBlock.getNextBlock();
+        }
+        return nodes;
+    }
+
+    /**
+     * Convert a single block to an AST node
+     */
+    blockToNode(block) {
+        switch (block.type) {
+            // --- Control Flow ---
+            case 'controls_repeat_ext': {
+                const timesBlock = block.getInputTargetBlock('TIMES');
+                let times = 2;
+                if (timesBlock) {
+                    times = this.expressionToNode(timesBlock) || 2;
+                }
+                const bodyBlock = block.getInputTargetBlock('DO');
+                return {
+                    type: 'Repeat',
+                    times: times,
+                    body: this.blocksToAST(bodyBlock)
+                };
+            }
+            case 'controls_whileUntil': {
+                const conditionBlock = block.getInputTargetBlock('BOOL');
+                const bodyBlock = block.getInputTargetBlock('DO');
+                // Blockly 'UNTIL' is equivalent to 'While NOT'
+                let condition = this.expressionToNode(conditionBlock);
+                if (block.getFieldValue('MODE') === 'UNTIL') {
+                    condition = { type: 'Not', child: condition };
+                }
+                return {
+                    type: 'While',
+                    condition: condition,
+                    body: this.blocksToAST(bodyBlock)
+                };
+            }
+            case 'controls_if': {
+                const conditionBlock = block.getInputTargetBlock('IF0');
+                const thenBlock = block.getInputTargetBlock('DO0');
+                const elseBlock = block.getInputTargetBlock('ELSE');
+
+                return {
+                    type: 'If',
+                    condition: this.expressionToNode(conditionBlock),
+                    then: this.blocksToAST(thenBlock),
+                    else: this.blocksToAST(elseBlock)
+                };
+            }
+
+            // --- Actions ---
+            case 'F_Jump':
+            case 'FR_Jump':
+            case 'FL_Jump':
+            case 'Turn': {
+                let val;
+                // Check if the input is a field or a connected block (for future extensibility)
+                // Currently these blocks use FieldDropdowns for values
+                val = block.getFieldValue('VALUE');
+                if (block.type.includes('Jump')) val = parseInt(val);
+                return { type: block.type, value: val };
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Convert expression blocks to AST nodes
+     */
+    expressionToNode(block) {
+        if (!block) return 0;
+
+        switch (block.type) {
+            case 'math_number':
+                return parseFloat(block.getFieldValue('NUM'));
+
+            case 'logic_boolean':
+                return block.getFieldValue('BOOL') === 'TRUE';
+
+            case 'math_arithmetic': {
+                const op = block.getFieldValue('OP'); // ADD, MINUS, MULTIPLY, DIVIDE, POWER
+                const left = this.expressionToNode(block.getInputTargetBlock('A'));
+                const right = this.expressionToNode(block.getInputTargetBlock('B'));
+                return { type: 'Binary', op: op, left: left, right: right };
+            }
+
+            case 'logic_compare': {
+                const op = block.getFieldValue('OP'); // EQ, NEQ, LT, LTE, GT, GTE
+                const left = this.expressionToNode(block.getInputTargetBlock('A'));
+                const right = this.expressionToNode(block.getInputTargetBlock('B'));
+                return { type: 'Compare', op: op, left: left, right: right };
+            }
+
+            case 'logic_operation': {
+                const op = block.getFieldValue('OP'); // AND, OR
+                const left = this.expressionToNode(block.getInputTargetBlock('A'));
+                const right = this.expressionToNode(block.getInputTargetBlock('B'));
+                return { type: 'Logic', op: op, left: left, right: right };
+            }
+
+            case 'logic_negate': {
+                return { type: 'Not', child: this.expressionToNode(block.getInputTargetBlock('BOOL')) };
+            }
+
+            case 'bunny_x':
+                return { type: 'Get', name: 'bunny_x' };
+
+            case 'bunny_y':
+                return { type: 'Get', name: 'bunny_y' };
+        }
+        return 0;
     }
 
     /**
      * Run the full program
      */
     async runProgram() {
-        const program = this.getFlattenedProgram();
+        const program = this.getProgramAST();
         if (program.length === 0) {
             alert('請先建立程式！');
             return;
@@ -284,7 +424,7 @@ class BlockEditor {
      * Execute one step
      */
     async stepProgram() {
-        const program = this.getFlattenedProgram();
+        const program = this.getProgramAST();
         if (program.length === 0) {
             alert('請先建立程式！');
             return;
