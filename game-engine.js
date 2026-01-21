@@ -97,6 +97,10 @@ class GameEngine {
                             cell.classList.add('stone');
                             cell.textContent = '🪨';
                             break;
+                        case 'puddle':
+                            cell.classList.add('puddle');
+                            cell.textContent = '💧';
+                            break;
                     }
                 }
 
@@ -251,6 +255,10 @@ class GameEngine {
         } else if (cell.type === 'stone') {
             this.score = Math.max(0, this.score - 10);
             this.setStatus('撞到石頭！-10 草莓', 'gameover');
+            await this.delay(300);
+        } else if (cell.type === 'puddle') {
+            this.moveCount += 5;
+            this.setStatus('踩到水坑！+5 步', 'warning');
             await this.delay(300);
         }
 

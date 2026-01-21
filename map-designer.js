@@ -181,6 +181,12 @@ class MapDesigner {
                     this.bunnyPosition = null;
                 }
                 break;
+            case 'puddle':
+                this.mapData[y][x] = { type: 'puddle', value: 0 };
+                if (this.bunnyPosition && this.bunnyPosition.x === x && this.bunnyPosition.y === y) {
+                    this.bunnyPosition = null;
+                }
+                break;
             case 'bunny':
                 this.bunnyPosition = { x, y, direction: this.bunnyDirection };
                 this.mapData[y][x] = { type: 'empty', value: 0 };
@@ -192,7 +198,7 @@ class MapDesigner {
     }
 
     /**
-     * Cycle cell content: Empty -> Strawberry(1-3) -> Stone -> Empty
+     * Cycle cell content: Empty -> Strawberry(1-3) -> Stone -> Puddle -> Empty
      */
     cycleCell(x, y) {
         // If clicking on bunny, remove it and start cycle
@@ -216,7 +222,10 @@ class MapDesigner {
                 this.mapData[y][x] = { type: 'stone', value: 0 };
             }
         } else if (current.type === 'stone') {
-            // Stone -> Empty
+            // Stone -> Puddle
+            this.mapData[y][x] = { type: 'puddle', value: 0 };
+        } else if (current.type === 'puddle') {
+            // Puddle -> Empty
             this.mapData[y][x] = { type: 'empty', value: 0 };
         } else {
             // Default reset
@@ -268,6 +277,10 @@ class MapDesigner {
                 case 'stone':
                     cell.classList.add('stone');
                     cell.textContent = '🪨';
+                    break;
+                case 'puddle':
+                    cell.classList.add('puddle');
+                    cell.textContent = '💧';
                     break;
             }
         });

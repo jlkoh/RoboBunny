@@ -384,6 +384,10 @@ body {
     background: linear-gradient(135deg, #4b5563, #374151);
 }
 
+.cell.puddle {
+    background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+}
+
 .cell.strawberry {
     background: linear-gradient(135deg, var(--grass), var(--grass-dark));
 }
