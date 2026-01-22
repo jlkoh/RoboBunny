@@ -47,6 +47,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Apply block limit from map
                     const blockLimit = mapData.blockLimit || 20;
                     blockEditor.setBlockLimit(blockLimit);
+
+                    // Always switch to Bunny 1 when loading a new map
+                    // This prevents getting stuck on Bunny 2's empty workspace if the new map is single-bunny
+                    blockEditor.switchToBunny(1);
+
+                    // Click the first tab to update UI visual state
+                    const firstTab = document.querySelector('.bunny-tab[data-bunny="1"]');
+                    if (firstTab) firstTab.click();
                 }
             }
         });

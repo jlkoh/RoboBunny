@@ -153,6 +153,10 @@ class BlockEditor {
         if (!this.workspace) return;
         if (bunnyNum === this.currentBunny) return;
 
+        // Hide any open widgets (like dropdowns or input fields)
+        if (Blockly.WidgetDiv) Blockly.WidgetDiv.hide();
+        if (Blockly.DropDownDiv) Blockly.DropDownDiv.hideWithoutAnimation();
+
         // Save current workspace state
         this.workspaceStates[this.currentBunny - 1] = Blockly.Xml.workspaceToDom(this.workspace);
 
@@ -552,6 +556,10 @@ class BlockEditor {
      */
     resize() {
         if (this.workspace) {
+            // Hide artifacts when resizing/switching views
+            if (Blockly.WidgetDiv) Blockly.WidgetDiv.hide();
+            if (Blockly.DropDownDiv) Blockly.DropDownDiv.hideWithoutAnimation();
+
             Blockly.svgResize(this.workspace);
         }
     }
