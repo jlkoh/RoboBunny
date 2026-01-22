@@ -426,6 +426,31 @@ body {
 .bunny-sprite {
     font-size: 18px;
     transition: transform 0.3s ease;
+    position: relative;
+    /* Context for badge */
+}
+
+.bunny-badge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    background: var(--primary);
+    color: white;
+    font-size: 9px;
+    width: 14px;
+    height: 14px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    font-weight: 800;
+    z-index: 2;
+}
+
+.cell.bunny2 .bunny-badge {
+    background: #d45dff;
+    /* Distinct color for Bunny 2 badge */
 }
 
 .bunny-sprite.up {
@@ -441,7 +466,26 @@ body {
 }
 
 .bunny-sprite.left {
-    transform: rotate(-90deg);
+    transform: rotate(270deg);
+}
+
+/* Header Bunny Badges */
+.bunny-label {
+    position: relative;
+    display: inline-block;
+}
+
+.header-badge {
+    top: -2px;
+    right: -8px;
+    width: 16px;
+    height: 16px;
+    font-size: 10px;
+    border: 2px solid var(--card-bg);
+}
+
+.bunny-stats#bunny2-stats .header-badge {
+    background: #d45dff;
 }
 
 /* ===== Game Layout ===== */
@@ -473,6 +517,61 @@ body {
     margin-bottom: 0;
     color: var(--primary);
     background: rgba(0, 0, 0, 0.2);
+}
+
+/* Bunny Tabs for dual bunny mode */
+.bunny-tabs {
+    display: flex;
+    gap: 5px;
+    padding: 10px 20px;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.bunny-tab {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    font-family: var(--font);
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid transparent;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.bunny-tab:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--text);
+}
+
+.bunny-tab.active {
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    color: var(--text);
+    border-color: transparent;
+}
+
+/* Bunny Stats for game header */
+.bunny-stats {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.bunny-label {
+    font-size: 1.5rem;
+}
+
+/* Bunny 2 styling */
+.cell.bunny2 .bunny-sprite {
+    filter: hue-rotate(180deg) brightness(1.2);
+    /* Purple/Pink bunny */
+}
+
+/* Override background specifically for bunny2 if needed, or keep shared bunny background */
+.cell.bunny2 {
+    /* Optional: different background glow for bunny 2 */
+    background: linear-gradient(135deg, #a78bfa, #8b5cf6);
 }
 
 #blocklyDiv {

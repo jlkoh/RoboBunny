@@ -10,6 +10,10 @@ class BlockEditor {
         this.currentStep = 0;
         this.blockLimit = 20;
 
+        // Dual bunny support
+        this.currentBunny = 1; // 1 or 2
+        this.workspaceStates = [null, null]; // Saved XML for each bunny
+
         // Initialize when DOM is ready
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => this.init());
@@ -117,9 +121,51 @@ class BlockEditor {
             this.bindControlEvents();
             this.workspace.addChangeListener(() => this.updateBlockCount());
 
+            // Tab switching for dual bunny mode
+            this.bindBunnyTabs();
+
             // Initial count update
             this.updateBlockCount();
         }, 100);
+    }
+
+    /**
+     * Bind bunny tab switching events
+     */
+    bindBunnyTabs() {
+        const tabs = document.querySelectorAll('.bunny-tab');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const bunnyNum = parseInt(tab.dataset.bunny);
+                this.switchToBunny(bunnyNum);
+
+                // Update active state
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+            });
+        });
+    }
+
+    /**
+     * Switch to a different bunny's workspace
+     */
+    switchToBunny(bunnyNum) {
+        if (!this.workspace) return;
+        if (bunnyNum === this.currentBunny) return;
+
+        // Save current workspace state
+        this.workspaceStates[this.currentBunny - 1] = Blockly.Xml.workspaceToDom(this.workspace);
+
+        // Clear workspace
+        this.workspace.clear();
+
+        // Load target bunny's workspace
+        if (this.workspaceStates[bunnyNum - 1]) {
+            Blockly.Xml.domToWorkspace(this.workspaceStates[bunnyNum - 1], this.workspace);
+        }
+
+        this.currentBunny = bunnyNum;
+        this.updateBlockCount();
     }
 
     /**
@@ -405,12 +451,20 @@ class BlockEditor {
         return 0;
     }
 
-    /**
-     * Run the full program
-     */
     async runProgram() {
-        const program = this.getProgramAST();
-        if (program.length === 0) {
+        // Get program for bunny 1
+        // First, make sure we have the current workspace saved
+        this.workspaceStates[this.currentBunny - 1] = Blockly.Xml.workspaceToDom(this.workspace);
+
+        const program1 = this.getProgramASTFromState(0);
+        let program2 = null;
+
+        // Check if dual bunny mode
+        if (this.gameEngine.bunnyCount === 2) {
+            program2 = this.getProgramASTFromState(1);
+        }
+
+        if (program1.length === 0 && (!program2 || program2.length === 0)) {
             alert('請先建立程式！');
             return;
         }
@@ -421,10 +475,59 @@ class BlockEditor {
         }
 
         this.resetGame();
-        // Small delay to allow reset to visually clear
         await new Promise(resolve => setTimeout(resolve, 100));
 
-        await this.gameEngine.executeProgram(program);
+        await this.gameEngine.executeProgram(program1, program2);
+    }
+
+    /**
+     * Get AST from saved workspace state
+     */
+    getProgramASTFromState(bunnyIndex) {
+        const state = this.workspaceStates[bunnyIndex];
+        if (!state) return [];
+
+        // Create a temporary hidden workspace to parse the XML
+        const tempDiv = document.createElement('div');
+        tempDiv.style.display = 'none';
+        document.body.appendChild(tempDiv);
+
+        const tempWorkspace = Blockly.inject(tempDiv, { readOnly: true });
+        Blockly.Xml.domToWorkspace(state, tempWorkspace);
+
+        const topBlocks = tempWorkspace.getTopBlocks(true);
+        let ast = [];
+        if (topBlocks.length > 0) {
+            ast = this.blocksToASTFromWorkspace(topBlocks[0], tempWorkspace);
+        }
+
+        tempWorkspace.dispose();
+        document.body.removeChild(tempDiv);
+
+        return ast;
+    }
+
+    /**
+     * Convert blocks to AST from a specific workspace
+     */
+    blocksToASTFromWorkspace(startBlock, workspace) {
+        const nodes = [];
+        let currentBlock = startBlock;
+
+        while (currentBlock) {
+            if (!currentBlock.isEnabled()) {
+                currentBlock = currentBlock.getNextBlock();
+                continue;
+            }
+
+            const node = this.blockToNode(currentBlock);
+            if (node) {
+                nodes.push(node);
+            }
+
+            currentBlock = currentBlock.getNextBlock();
+        }
+        return nodes;
     }
 
     /**

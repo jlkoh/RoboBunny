@@ -53,7 +53,11 @@
                         </button>
                         <button class="tool-btn" data-tool="bunny" title="兔子起點">
                             <span class="tool-icon">🐰</span>
-                            <span>兔子</span>
+                            <span>兔子 1</span>
+                        </button>
+                        <button class="tool-btn" data-tool="bunny2" title="兔子2起點">
+                            <span class="tool-icon">🐰</span>
+                            <span>兔子 2</span>
                         </button>
                     </div>
 
@@ -118,55 +122,81 @@
                 <div class="block-editor">
                     <h3>🧩 程式積木</h3>
 
-                    <div id="blocklyDiv" style="height: 600px; width: 100%;"></div>
-                    <xml id="toolbox" style="display: none">
-                        <category name="移動指令" colour="#5b80a5">
-                            <block type="F_Jump"></block>
-                            <block type="FR_Jump"></block>
-                            <block type="FL_Jump"></block>
-                        </category>
-                        <category name="轉向指令" colour="#5ba55b">
-                            <block type="Turn"></block>
-                        </category>
-                        <category name="控制" colour="#a55b80">
-                            <block type="controls_repeat_ext">
-                                <value name="TIMES">
-                                    <shadow type="math_number">
-                                        <field name="NUM">2</field>
-                                    </shadow>
-                                </value>
-                            </block>
-                        </category>
-                    </xml>
-                </div>
+                    <div class="bunny-tabs" id="bunny-tabs" style="display: none;">
+                        <button class="bunny-tab active" data-bunny="1">🐰 兔子 1</button>
+                        <button class="bunny-tab" data-bunny="2">🐰 兔子 2</button>
+                    </div>
 
-                <!-- Game Grid -->
-                <div class="game-container">
-                    <div class="game-header">
+                    <div id="blocklyDiv" style="height: 600px; width: 100%;"></div>
+                </div>
+                <xml id="toolbox" style="display: none">
+                    <category name="移動指令" colour="#5b80a5">
+                        <block type="F_Jump"></block>
+                        <block type="FR_Jump"></block>
+                        <block type="FL_Jump"></block>
+                    </category>
+                    <category name="轉向指令" colour="#5ba55b">
+                        <block type="Turn"></block>
+                    </category>
+                    <category name="控制" colour="#a55b80">
+                        <block type="controls_repeat_ext">
+                            <value name="TIMES">
+                                <shadow type="math_number">
+                                    <field name="NUM">2</field>
+                                </shadow>
+                            </value>
+                        </block>
+                    </category>
+                </xml>
+            </div>
+
+            <!-- Game Grid -->
+            <div class="game-container">
+                <div class="game-header">
+                    <div class="bunny-stats" id="bunny1-stats">
+                        <span class="bunny-label">
+                            🐰
+                            <span class="bunny-badge header-badge">1</span>
+                        </span>
                         <div class="score-display">
                             <span class="score-icon">🍓</span>
-                            <span class="score-value" id="score">0</span>
+                            <span class="score-value" id="score1">0</span>
                         </div>
                         <div class="score-display move-display">
                             <span class="score-icon">👣</span>
-                            <span class="score-value" id="move-count">0</span>
+                            <span class="score-value" id="move-count1">0</span>
                         </div>
-                        <div class="game-status" id="game-status">準備開始</div>
                     </div>
-
-                    <div class="grid" id="game-grid"></div>
-
-                    <div class="game-controls">
-                        <select id="map-selector" class="map-select">
-                            <option value="">-- 選擇地圖 --</option>
-                        </select>
-                        <button class="control-btn" id="run-btn">▶️ 執行</button>
-                        <button class="control-btn" id="step-btn">⏭️ 單步</button>
-                        <button class="control-btn" id="reset-btn">🔄 重置</button>
+                    <div class="bunny-stats" id="bunny2-stats" style="display: none;">
+                        <span class="bunny-label">
+                            🐰
+                            <span class="bunny-badge header-badge">2</span>
+                        </span>
+                        <div class="score-display">
+                            <span class="score-icon">🍓</span>
+                            <span class="score-value" id="score2">0</span>
+                        </div>
+                        <div class="score-display move-display">
+                            <span class="score-icon">👣</span>
+                            <span class="score-value" id="move-count2">0</span>
+                        </div>
                     </div>
+                    <div class="game-status" id="game-status">準備開始</div>
+                </div>
+
+                <div class="grid" id="game-grid"></div>
+
+                <div class="game-controls">
+                    <select id="map-selector" class="map-select">
+                        <option value="">-- 選擇地圖 --</option>
+                    </select>
+                    <button class="control-btn" id="run-btn">▶️ 執行</button>
+                    <button class="control-btn" id="step-btn">⏭️ 單步</button>
+                    <button class="control-btn" id="reset-btn">🔄 重置</button>
                 </div>
             </div>
-        </section>
+    </div>
+    </section>
     </div>
 
     <script src="map-designer.js"></script>

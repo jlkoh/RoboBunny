@@ -9,8 +9,10 @@ class MapDesigner {
         this.currentTool = 'cycle';
         this.strawberryCount = 1;
         this.bunnyDirection = 'up';
+        this.bunny2Direction = 'up';
         this.mapData = this.createEmptyMap();
         this.bunnyPosition = null;
+        this.bunnyPosition2 = null;
 
         this.init();
     }
@@ -88,12 +90,21 @@ class MapDesigner {
             btn.addEventListener('click', (e) => {
                 document.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                this.bunnyDirection = btn.dataset.dir;
 
-                // If bunny is already placed, update its direction
-                if (this.bunnyPosition) {
-                    this.bunnyPosition.direction = this.bunnyDirection;
-                    this.renderGrid();
+                const dir = btn.dataset.dir;
+
+                if (this.currentTool === 'bunny2') {
+                    this.bunny2Direction = dir;
+                    if (this.bunnyPosition2) {
+                        this.bunnyPosition2.direction = dir;
+                        this.renderGrid();
+                    }
+                } else {
+                    this.bunnyDirection = dir;
+                    if (this.bunnyPosition) {
+                        this.bunnyPosition.direction = dir;
+                        this.renderGrid();
+                    }
                 }
             });
         });
@@ -147,7 +158,20 @@ class MapDesigner {
             strawberryOptions.style.display = this.currentTool === 'strawberry' ? 'block' : 'none';
         }
         if (directionOptions) {
-            directionOptions.style.display = this.currentTool === 'bunny' ? 'block' : 'none';
+            const showDirection = (this.currentTool === 'bunny' || this.currentTool === 'bunny2');
+            directionOptions.style.display = showDirection ? 'block' : 'none';
+
+            if (showDirection) {
+                // Update active button based on current bunny's direction
+                const currentDir = this.currentTool === 'bunny2' ? this.bunny2Direction : this.bunnyDirection;
+                document.querySelectorAll('.dir-btn').forEach(btn => {
+                    if (btn.dataset.dir === currentDir) {
+                        btn.classList.add('active');
+                    } else {
+                        btn.classList.remove('active');
+                    }
+                });
+            }
         }
     }
 
@@ -193,6 +217,18 @@ class MapDesigner {
             case 'bunny':
                 this.bunnyPosition = { x, y, direction: this.bunnyDirection };
                 this.mapData[y][x] = { type: 'empty', value: 0 };
+                // Clear bunny2 if it was on this cell
+                if (this.bunnyPosition2 && this.bunnyPosition2.x === x && this.bunnyPosition2.y === y) {
+                    this.bunnyPosition2 = null;
+                }
+                break;
+            case 'bunny2':
+                this.bunnyPosition2 = { x, y, direction: this.bunny2Direction };
+                this.mapData[y][x] = { type: 'empty', value: 0 };
+                // Clear bunny1 if it was on this cell
+                if (this.bunnyPosition && this.bunnyPosition.x === x && this.bunnyPosition.y === y) {
+                    this.bunnyPosition = null;
+                }
                 break;
         }
 
@@ -253,13 +289,34 @@ class MapDesigner {
             cell.className = 'cell';
             cell.innerHTML = '';
 
-            // Check if bunny is here
+            // Check if bunny 1 is here
             if (this.bunnyPosition && this.bunnyPosition.x === x && this.bunnyPosition.y === y) {
-                cell.classList.add('bunny');
+                cell.classList.add('bunny', 'bunny1');
                 const sprite = document.createElement('span');
-                // Use the stored direction from bunnyPosition, not the current tool state
                 sprite.className = `bunny-sprite ${this.bunnyPosition.direction}`;
                 sprite.textContent = '🐰';
+
+                const badge = document.createElement('span');
+                badge.className = 'bunny-badge';
+                badge.textContent = '1';
+                sprite.appendChild(badge);
+
+                cell.appendChild(sprite);
+                return;
+            }
+
+            // Check if bunny 2 is here
+            if (this.bunnyPosition2 && this.bunnyPosition2.x === x && this.bunnyPosition2.y === y) {
+                cell.classList.add('bunny', 'bunny2');
+                const sprite = document.createElement('span');
+                sprite.className = `bunny-sprite ${this.bunnyPosition2.direction}`;
+                sprite.textContent = '🐰';
+
+                const badge = document.createElement('span');
+                badge.className = 'bunny-badge';
+                badge.textContent = '2';
+                sprite.appendChild(badge);
+
                 cell.appendChild(sprite);
                 return;
             }
@@ -316,6 +373,7 @@ class MapDesigner {
         if (confirm('確定要清空地圖嗎？')) {
             this.mapData = this.createEmptyMap();
             this.bunnyPosition = null;
+            this.bunnyPosition2 = null;
             this.renderGrid();
             this.updateStrawberryTotal();
         }
@@ -341,6 +399,7 @@ class MapDesigner {
             gridSize: this.gridSize,
             mapData: this.mapData,
             bunnyPosition: this.bunnyPosition,
+            bunnyPosition2: this.bunnyPosition2,
             blockLimit: blockLimit,
             createdAt: new Date().toISOString()
         };
@@ -412,6 +471,7 @@ class MapDesigner {
         if (map) {
             this.mapData = map.mapData;
             this.bunnyPosition = map.bunnyPosition;
+            this.bunnyPosition2 = map.bunnyPosition2 || null;
             this.bunnyDirection = map.bunnyPosition.direction;
 
             // Update direction button
@@ -459,6 +519,7 @@ class MapDesigner {
             gridSize: this.gridSize,
             mapData: this.mapData,
             bunnyPosition: this.bunnyPosition,
+            bunnyPosition2: this.bunnyPosition2,
             blockLimit: blockLimit,
             createdAt: new Date().toISOString()
         };
