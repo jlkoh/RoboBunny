@@ -323,7 +323,19 @@ class GameEngine {
         if (!bunny || !this.bunnyActive[bunnyIdx]) return false;
 
         // Check boundary - bunny leaves map but game continues for other
+        // Check boundary - bunny leaves map but game continues for other
         if (newX < 0 || newX >= this.gridSize || newY < 0 || newY >= this.gridSize) {
+            // Animate jump out of bounds
+            const bunnyCell = document.querySelector(`.cell.bunny${bunnyIdx + 1}`);
+            if (bunnyCell) {
+                // Determine direction for jump animation
+                const jumpClass = `jumping-${bunny.direction}`; // You might need new CSS for direction-specific jumps if default 'jumping' isn't enough, but 'jumping' is vertical.
+                // For now, reuse existing jumping class which goes up and down.
+                bunnyCell.classList.add('jumping');
+            }
+
+            await this.delay(this.stepDelay);
+
             this.bunnyActive[bunnyIdx] = false;
             this.setStatus(`兔子 ${bunnyIdx + 1} 跳出邊界！`, 'warning');
             this.renderGrid();
