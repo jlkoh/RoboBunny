@@ -104,6 +104,12 @@ class BlockEditor {
                             { 'kind': 'block', 'type': 'bunny_x' },
                             { 'kind': 'block', 'type': 'bunny_y' }
                         ]
+                    },
+                    {
+                        'kind': 'category',
+                        'name': '變數',
+                        'colour': '#a55b80',
+                        'custom': 'VARIABLE'
                     }
                 ]
             };
@@ -344,6 +350,18 @@ class BlockEditor {
      */
     blockToNode(block) {
         switch (block.type) {
+            case 'variables_set': {
+                const varName = block.getField('VAR').getText();
+                const value = this.expressionToNode(block.getInputTargetBlock('VALUE')) || 0;
+                return { type: 'SetVar', name: varName, value: value };
+            }
+
+            case 'math_change': {
+                const varName = block.getField('VAR').getText();
+                const delta = this.expressionToNode(block.getInputTargetBlock('DELTA')) || 1;
+                return { type: 'ChangeVar', name: varName, delta: delta };
+            }
+
             // --- Control Flow ---
             case 'controls_repeat_ext': {
                 const timesBlock = block.getInputTargetBlock('TIMES');
@@ -362,10 +380,14 @@ class BlockEditor {
                 const conditionBlock = block.getInputTargetBlock('BOOL');
                 const bodyBlock = block.getInputTargetBlock('DO');
                 // Blockly 'UNTIL' is equivalent to 'While NOT'
+                // But for simplicity, we map both to a generic while structure (logic handled in node evaluation)
+                const isUntil = block.getFieldValue('MODE') === 'UNTIL';
+
                 let condition = this.expressionToNode(conditionBlock);
-                if (block.getFieldValue('MODE') === 'UNTIL') {
+                if (isUntil) {
                     condition = { type: 'Not', child: condition };
                 }
+
                 return {
                     type: 'While',
                     condition: condition,
@@ -374,14 +396,14 @@ class BlockEditor {
             }
             case 'controls_if': {
                 const conditionBlock = block.getInputTargetBlock('IF0');
-                const thenBlock = block.getInputTargetBlock('DO0');
+                const bodyBlock = block.getInputTargetBlock('DO0');
                 const elseBlock = block.getInputTargetBlock('ELSE');
 
                 return {
                     type: 'If',
                     condition: this.expressionToNode(conditionBlock),
-                    then: this.blocksToAST(thenBlock),
-                    else: this.blocksToAST(elseBlock)
+                    then: this.blocksToAST(bodyBlock),
+                    else: elseBlock ? this.blocksToAST(elseBlock) : []
                 };
             }
 
@@ -398,7 +420,7 @@ class BlockEditor {
                 return { type: block.type, value: val };
             }
         }
-        return null;
+        return null; // Ignore unknown blocks
     }
 
     /**
@@ -410,6 +432,9 @@ class BlockEditor {
         switch (block.type) {
             case 'math_number':
                 return parseFloat(block.getFieldValue('NUM'));
+
+            case 'variables_get':
+                return { type: 'GetVar', name: block.getField('VAR').getText() };
 
             case 'logic_boolean':
                 return block.getFieldValue('BOOL') === 'TRUE';

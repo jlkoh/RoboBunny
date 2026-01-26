@@ -14,6 +14,7 @@ class GameEngine {
         this.scores = [0, 0];
         this.moveCounts = [0, 0];
         this.bunnyActive = [true, true];
+        this.variables = [{}, {}]; // Variables for each bunny
         this.bunnyCount = 1; // 1 or 2 based on map
 
         this.originalMap = null;
@@ -86,6 +87,7 @@ class GameEngine {
         this.scores[0] = 0;
         this.moveCounts[0] = 0;
         this.bunnyActive[0] = true;
+        this.variables[0] = {}; // Reset variables for bunny 1
 
         // Reset bunny 2 if exists
         if (this.bunnyCount === 2) {
@@ -93,6 +95,7 @@ class GameEngine {
             this.scores[1] = 0;
             this.moveCounts[1] = 0;
             this.bunnyActive[1] = true;
+            this.variables[1] = {}; // Reset variables for bunny 2
         } else {
             this.bunnies[1] = null;
             this.bunnyActive[1] = false;
@@ -529,6 +532,22 @@ class GameEngine {
                 }
                 await this.executeCommandForBunny({ type: node.type, value: val }, bunnyIdx);
                 break;
+
+            case 'SetVar': {
+                const value = this.evaluateForBunny(node.value, bunnyIdx);
+                // Ensure array index exists
+                if (!this.variables[bunnyIdx]) this.variables[bunnyIdx] = {};
+                this.variables[bunnyIdx][node.name] = value;
+                break;
+            }
+
+            case 'ChangeVar': {
+                const delta = this.evaluateForBunny(node.delta, bunnyIdx);
+                if (!this.variables[bunnyIdx]) this.variables[bunnyIdx] = {};
+                const currentVal = this.variables[bunnyIdx][node.name] || 0;
+                this.variables[bunnyIdx][node.name] = currentVal + delta;
+                break;
+            }
         }
     }
 
@@ -568,6 +587,10 @@ class GameEngine {
             case 'Boolean':
             case 'String':
                 return node.value;
+
+            case 'GetVar':
+                if (!this.variables[bunnyIdx]) return 0;
+                return this.variables[bunnyIdx][node.name] || 0;
 
             case 'Get':
                 if (node.name === 'bunny_x') return bunny ? bunny.x : 0;
